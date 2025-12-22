@@ -1,0 +1,25 @@
+[package]
+name = "matter_setup_code"
+version = "0.1.0"
+edition = "2024"
+description = "Parse and generate Matter onboarding payloads, including QR codes and manual setup codes."
+authors = ["Antoine Raulin <contact@araulin.eu>"]
+repository = "https://git.araul.in/antoine/matter-setup-code"
+homepage = "https://git.araul.in/antoine/matter-setup-code"
+readme="README.md"
+license = "CC-BY-NC-SA-4.0"
+keywords = [
+    "matter",
+    "iot",
+    "qrcode",
+    "chip",
+    "base38"
+]
+categories = [
+    "embedded",
+    "encoding",
+    "network-programming"
+]
+
+[dependencies]
+thiserror = "2"
