@@ -120,7 +120,6 @@ pub fn decode(s: &str) -> Result<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    // You only need to import the top-level error enum for the matches! macro
     use crate::error::MatterPayloadError; 
     use crate::error::Base38DecodeError;
 

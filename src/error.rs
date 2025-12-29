@@ -6,9 +6,9 @@ pub enum MatterPayloadError {
     /// Errors originating from the Base38 decoding process.
     #[error("Base38 decoding failed")]
     Base38(#[from] Base38DecodeError),
-    // You can add other top-level errors here later, e.g.:
-    // #[error("Payload parsing failed: {0}")]
-    // PayloadParse(String),
+    /// Errors originating from the Verhoeff checksum algorithm.
+    #[error("Verhoeff algorithm error")]
+    Verhoeff(#[from] VerhoeffError),
 }
 
 /// Specific errors that can occur during Base38 decoding.
@@ -26,6 +26,16 @@ pub enum Base38DecodeError {
         digits: usize,
         expected_bytes: usize,
     },
+}
+
+/// Specific errors that can occur during Verhoeff checksum operations.
+#[derive(Error, Debug, PartialEq, Eq)]
+pub enum VerhoeffError {
+    #[error("input contains non-digit character '{0}'")]
+    InvalidCharacter(char),
+
+    #[error("input cannot be empty")]
+    EmptyInput,
 }
 
 pub type Result<T> = std::result::Result<T, MatterPayloadError>;
