@@ -129,22 +129,27 @@ impl SetupPayload {
     }
 
     /// Generates the QR code string ("MT:...") for this payload.
-    // pub fn to_qr_code_str(&self) -> Result<String> {
-    //     let qr_data = QrCodeData {
-    //         version: 0,
-    //         vid: self.vid,
-    //         pid: self.pid,
-    //         flow: self.flow,
-    //         discovery_capabilities: self.discovery_capabilities,
-    //         discriminator: self.discriminator,
-    //         pincode: self.pincode,
-    //         padding: 0,
-    //     };
+    pub fn to_qr_code_str(&self) -> Result<String> {
+        let qr_data = QrCodeData {
+            version: 0,
+            vid: self.vid.expect("VID is required for QR code generation"),
+            pid: self.pid.expect("PID is required for QR code generation"),
+            flow: self.flow,
+            discovery: self
+                .discovery
+                .expect("Discovery is required for QR code generation"),
+            discriminator: self
+                .long_discriminator
+                .expect("Long discriminator is required for QR code generation"),
+            pincode: self.pincode,
+            padding: 0,
+        };
 
-    //     let bytes = qr_data.to_bytes()?;
-    //     let encoded = base38::encode(&bytes);
-    //     Ok(format!("MT:{}", encoded))
-    // }
+        let mut bytes = qr_data.to_bytes()?;
+        bytes.reverse();
+        let encoded = base38::encode(&bytes);
+        Ok(format!("MT:{}", encoded))
+    }
 
     /// Generates the numeric manual pairing code string for this payload.
     ///
@@ -263,20 +268,20 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn test_qr_code_roundtrip() {
-    //     let original_payload = standard_payload();
-    //     let qr_str = original_payload.to_qr_code_str().unwrap();
+    #[test]
+    fn test_qr_code_roundtrip() {
+        let original_payload = standard_payload();
+        let qr_str = original_payload.to_qr_code_str().unwrap();
 
-    //     // Python reference:
-    //     // ./chip-tool payload generate -d 1132 -p 69414998 -vid 65521 -pid 32768 -dm 4 -cf 0
-    //     // Manualcode : 11237442363
-    //     // QRCode     : MT:Y.K904QI143LH13SH10
-    //     assert_eq!(qr_str, "MT:Y.K904QI143LH13SH10");
+        // Python reference:
+        // ./chip-tool payload generate -d 1132 -p 69414998 -vid 65521 -pid 32768 -dm 4 -cf 0
+        // Manualcode : 11237442363
+        // QRCode     : MT:Y.K904QI143LH13SH10
+        assert_eq!(qr_str, "MT:Y.K904QI143LH13SH10");
 
-    //     let parsed_payload = SetupPayload::from_str(&qr_str).unwrap();
-    //     assert_eq!(original_payload, parsed_payload);
-    // }
+        let parsed_payload = SetupPayload::from_str(&qr_str).unwrap();
+        assert_eq!(original_payload, parsed_payload);
+    }
 
     #[test]
     fn test_manual_code_roundtrip() {
