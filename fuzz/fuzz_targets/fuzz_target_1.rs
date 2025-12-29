@@ -9,6 +9,6 @@ fuzz_target!(|data: &[u8]| {
         // 2. Feed it to your parser.
         // We assume your parser should return Ok(_) or Err(_), but NEVER panic.
         // The Result is ignored; we only care if the process crashes.
-        let _ = SetupPayload::from_str(s);
+        let _ = SetupPayload::parse_str(s);
     }
 });
