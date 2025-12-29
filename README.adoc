@@ -28,8 +28,7 @@ endif::[]
 
 
 image:https://img.shields.io/crates/v/matter-setup-code.svg[Crates.io, link=https://crates.io/crates/matter-setup-code]
-image:https://docs.rs/matter-setup-code/badge.svg[Docs.rs, link=https://docs.rs/matter-setup-code]
-image:https://img.shields.io/crates/l/matter-setup-code.svg[License, link=LICENSE]
+image:https://img.shields.io/crates/l/matter_setup_code.svg[License, link=LICENSE]
 
 A robust, type-safe Rust library for parsing and generating Matter onboarding payloads.
 
@@ -54,7 +53,7 @@ Add the following to your `Cargo.toml` file:
 [source,toml]
 ----
 [dependencies]
-matter-setup-code = "0.1.0"
+matter_setup_code = "0.1.0"
 ----
 
 == Usage
@@ -104,7 +103,7 @@ fn main() {
     // A sample QR code string
     let input = "MT:Y.K904QI143LH13SH10";
 
-    match SetupPayload::from_str(input) {
+    match SetupPayload::parse_str(input) {
         Ok(payload) => {
             println!("Parsed Successfully!");
             println!("Discriminator: {}", payload.discriminator);

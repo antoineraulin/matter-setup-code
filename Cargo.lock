@@ -116,7 +116,7 @@ dependencies = [
 
 [[package]]
 name = "matter_setup_code"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "deku",
  "thiserror",
