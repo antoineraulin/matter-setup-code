@@ -9,6 +9,9 @@ pub enum MatterPayloadError {
     /// Errors originating from the Verhoeff checksum algorithm.
     #[error("Verhoeff algorithm error")]
     Verhoeff(#[from] VerhoeffError),
+    /// Errors originating from bit manipulation utilities.
+    #[error("Bit utility error")]
+    BitUtils(#[from] BitUtilsError),
 }
 
 /// Specific errors that can occur during Base38 decoding.
@@ -36,6 +39,13 @@ pub enum VerhoeffError {
 
     #[error("input cannot be empty")]
     EmptyInput,
+}
+
+/// Specific errors that can occur during bit utility operations.
+#[derive(Error, Debug, PartialEq, Eq)]
+pub enum BitUtilsError {
+    #[error("value {value} overflows the requested {bits} bits")]
+    ValueOverflow { value: u64, bits: usize },
 }
 
 pub type Result<T> = std::result::Result<T, MatterPayloadError>;
