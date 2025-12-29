@@ -4,11 +4,21 @@ stages:
   - lint
   - fuzz
 
-# Global cache to speed up Rust builds
+# --- GLOBAL CONFIGURATION ---
+
+# Cache Rust artifacts to speed up builds
 cache:
   paths:
     - .cargo/
     - target/
+    - fuzz/target/
+
+# Include GitLab's official security templates here (Top Level)
+include:
+  - template: Security/Secret-Detection.gitlab-ci.yml
+  - template: Security/SAST.gitlab-ci.yml
+
+# --- JOBS ---
 
 # 1. Standard Unit Tests
 test:unit:
@@ -17,13 +27,7 @@ test:unit:
   script:
     - cargo test --verbose
 
-# 2. GitLab Secret Detection
-# Scans the history for accidental commit of keys/passwords
-include:
-  - template: Security/Secret-Detection.gitlab-ci.yml
-
-# 3. Rust-Specific Dependency Scanning (SCA)
-# Checks your dependencies against the RustSec Advisory Database
+# 2. Rust-Specific Dependency Scanning
 audit:dependencies:
   stage: security
   image: rust:latest
@@ -31,43 +35,42 @@ audit:dependencies:
     - cargo install cargo-audit
   script:
     - cargo audit
-  allow_failure: false # Fail the pipeline if a vulnerable dependency is found
+  allow_failure: false
 
-# 4. Rust-Specific Linting (Security & Quality)
-# Clippy catches common mistakes that lead to bugs or security flaws
+# 3. Rust-Specific Linting (Clippy)
 clippy:lint:
   stage: lint
   image: rust:latest
   before_script:
     - rustup component add clippy
   script:
-    # -D warnings makes the pipeline fail if Clippy finds issues
     - cargo clippy -- -D warnings
   allow_failure: false
 
-# 5. GitLab SAST (Generic)
-# Uses Semgrep to scan for general code issues
-sast:
-  stage: security
-  include:
-    - template: Security/SAST.gitlab-ci.yml
-  variables:
-    SAST_EXCLUDED_PATHS: "target/, .cargo/"
-
-# 6. Fuzz Testing
-# Runs the fuzzer for a short duration to catch regressions
+# 4. Fuzz Testing
 fuzz:smoke-test:
   stage: fuzz
-  image: rustlang/rust:nightly # Fuzzing requires Nightly Rust
+  image: rustlang/rust:nightly
   variables:
-    # Set a timeout so the CI doesn't run forever
     FUZZ_TIME: "60" 
   before_script:
     - cargo install cargo-fuzz
   script:
-    # -max_total_time is passed to libFuzzer to stop after 60 seconds
+    # Initialize fuzz folder if not exists (for CI robustness)
+    - cargo fuzz init || true 
     - cargo fuzz run fuzz_target_1 -- -max_total_time=$FUZZ_TIME
-  cache:
-    paths:
-      - fuzz/target/
-      - .cargo/
+
+# --- OVERRIDES FOR INCLUDED TEMPLATES ---
+
+# The SAST template defines a job named 'sast'. 
+# We reference it here ONLY to override the stage to 'security' 
+# (it defaults to 'test' in the template).
+sast:
+  stage: security
+  variables:
+    SAST_EXCLUDED_PATHS: "target/, .cargo/"
+
+# The Secret Detection template defines 'secret_detection'.
+# We override it to ensure it runs in the 'security' stage.
+secret_detection:
+  stage: security
