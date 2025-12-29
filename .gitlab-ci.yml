@@ -3,6 +3,7 @@ stages:
   - security
   - lint
   - fuzz
+  - publish
 
 # --- GLOBAL CONFIGURATION ---
 
@@ -74,3 +75,44 @@ sast:
 # We override it to ensure it runs in the 'security' stage.
 secret_detection:
   stage: security
+
+# --- PUBLISH JOBS ---
+
+# Job 1: Publish to GitLab Package Registry
+publish:gitlab:
+  stage: publish
+  image: rust:latest
+  rules:
+    # Only run this job when a tag is created (e.g. "v0.1.0")
+    - if: $CI_COMMIT_TAG
+  script:
+    # 1. Configure Cargo to know about your GitLab Registry
+    # We write this to .cargo/config.toml dynamically using environment variables
+    - mkdir -p .cargo
+    - |
+      cat <<EOF > .cargo/config.toml
+      [registries]
+      gitlab = { index = "sparse+${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/cargo/" }
+
+      [registry]
+      # This mapping ensures cargo uses the CI_JOB_TOKEN to authenticate
+      global-credential-providers = ["cargo:token-from-stdout"]
+
+      [credential-process]
+      # Helper to inject the token
+      gitlab = "echo ${CI_JOB_TOKEN}"
+      EOF
+    
+    # 2. Publish using the 'gitlab' registry defined above
+    - cargo publish --registry gitlab
+
+# Job 2: Publish to Crates.io
+publish:crates-io:
+  stage: publish
+  image: rust:latest
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    # Cargo publish defaults to crates.io
+    # We pass the token stored in GitLab Variables
+    - cargo publish --token $CRATES_IO_TOKEN
