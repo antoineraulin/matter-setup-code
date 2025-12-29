@@ -1,4 +1,5 @@
 use thiserror::Error;
+use deku::DekuError;
 
 /// The primary error type for the `matter-payload` library.
 #[derive(Error, Debug, PartialEq, Eq)]
@@ -12,6 +13,12 @@ pub enum MatterPayloadError {
     /// Errors originating from bit manipulation utilities.
     #[error("Bit utility error")]
     BitUtils(#[from] BitUtilsError),
+    /// Errors originating from payload parsing and generation processes.
+    #[error("Payload processing error")]
+    Payload(#[from] PayloadError),
+
+    #[error("Deku framework error: {0}")]
+    Deku(#[from] DekuError),
 }
 
 /// Specific errors that can occur during Base38 decoding.
@@ -46,6 +53,28 @@ pub enum VerhoeffError {
 pub enum BitUtilsError {
     #[error("value {value} overflows the requested {bits} bits")]
     ValueOverflow { value: u64, bits: usize },
+}
+
+/// Specific errors that can occur during payload parsing or generation.
+#[derive(Error, Debug, PartialEq, Eq)]
+pub enum PayloadError {
+    #[error("invalid payload length: expected 11 or 21, got {0}")]
+    InvalidManualCodeLength(usize),
+
+    #[error("manual code check digit is invalid")]
+    InvalidManualCodeChecksum,
+
+    #[error("manual code contains an invalid digit: {0}")]
+    InvalidManualCodeDigit(String),
+
+    #[error("manual code's first digit must be <= 7")]
+    InvalidManualCodePrefix,
+
+    #[error("QR code payload must start with 'MT:'")]
+    InvalidQrCodePrefix,
+
+    #[error("manual code discriminator must be <= 15, but was {0}")]
+    DiscriminatorOutOfRange(u8),
 }
 
 pub type Result<T> = std::result::Result<T, MatterPayloadError>;
