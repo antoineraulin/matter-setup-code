@@ -1,0 +1,181 @@
+= matter-setup-code
+:toc:
+
+ifdef::env-github[]
+++++
+<div align="center">
+
+<h3>ℹ️ Repository Notice</h3>
+<p><strong>This is a mirror repository.</strong></p>
+<p>The primary repository is hosted on <strong><a href="https://git.araul.in/antoine/matter-setup-code">GitLab</a></strong>.</p>
+<p><strong>Public contributions (Issues, Pull Requests) are managed on GitHub.</strong></p>
+</div>
+<br>
+++++
+endif::[]
+
+ifdef::env-gitlab[]
+++++
+<div align="center">
+<h3>ℹ️ Contribution Notice</h3>
+<p><strong>Public contributions (Issues, Pull Requests) are managed on GitHub.</strong></p>
+<p>Please visit the <strong><a href="https://github.com/antoineraulin/matter-setup-code">GitHub Mirror</a></strong> to report issues or submit changes.</p>
+<p>This GitLab repository is the canonical source for code, but external account creation is disabled.</p>
+</div>
+<br>
+++++
+endif::[]
+
+
+image:https://img.shields.io/crates/v/matter-setup-code.svg[Crates.io, link=https://crates.io/crates/matter-setup-code]
+image:https://docs.rs/matter-setup-code/badge.svg[Docs.rs, link=https://docs.rs/matter-setup-code]
+image:https://img.shields.io/crates/l/matter-setup-code.svg[License, link=LICENSE]
+
+A robust, type-safe Rust library for parsing and generating Matter onboarding payloads.
+
+This library implements the full specification for Matter Setup Payloads, allowing developers to encode and decode the QR codes and Manual Pairing codes found on Matter-compliant IoT devices. It handles the low-level complexities of Base38 encoding, bit-packing, and Verhoeff checksum validation so you can focus on building your application.
+
+It is a faithful Rust port of the official `setup_payload.py` script found in the Project CHIP (Connected Home over IP) / Matter repository.
+
+
+== Features
+
+* **QR Code Generation**: Create standard "MT:..." strings ready for QR code rendering.
+* **Manual Code Generation**: Generate the 11 or 21-digit numeric codes used for manual entry.
+* **Parsing**: robustly parse existing payload strings into structured data.
+* **Validation**: Built-in Verhoeff checksum verification for manual codes.
+* **Standard Compliance**: Fully implements the Base38 encoding and bit-packing logic defined in the Matter Core Specification.
+* **Type Safety**: Uses Rust enums and structs to ensure valid payload states (e.g., Commissioning Flows).
+
+== Installation
+
+Add the following to your `Cargo.toml` file:
+
+[source,toml]
+----
+[dependencies]
+matter-setup-code = "0.1.0"
+----
+
+== Usage
+
+The core interaction happens through the `SetupPayload` struct. You can create a payload from raw parameters to generate codes, or parse strings to extract those parameters.
+
+=== Generating Codes
+
+To generate a QR code or Manual Pairing code, instantiate a `SetupPayload` with your device's commissioning data.
+
+[source,rust]
+----
+use matter_setup_code::{SetupPayload, CommissioningFlow};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Define the commissioning parameters for your device
+    let payload = SetupPayload::new(
+        1132,                           // Discriminator (12-bit)
+        69414998,                       // Setup Passcode (PIN)
+        65521,                          // Vendor ID (VID)
+        32768,                          // Product ID (PID)
+        CommissioningFlow::Standard,    // Flow type
+        4,                         // Discovery Capabilities (e.g., OnNetwork)
+    );
+
+    // Generate the QR Code string (starts with "MT:")
+    let qr_string = payload.to_qr_code_str()?;
+    println!("QR Payload: {}", qr_string);
+
+    // Generate the Manual Pairing Code (numeric string)
+    let manual_code = payload.to_manual_code_str()?;
+    println!("Manual Code: {}", manual_code);
+
+    Ok(())
+}
+----
+
+=== Parsing Codes
+
+If you are building a commissioner app (like a mobile app setup tool), you can parse scanned codes to retrieve device information.
+
+[source,rust]
+----
+use matter_setup_code::{SetupPayload, CommissioningFlow};
+
+fn main() {
+    // A sample QR code string
+    let input = "MT:Y.K904QI143LH13SH10";
+
+    match SetupPayload::from_str(input) {
+        Ok(payload) => {
+            println!("Parsed Successfully!");
+            println!("Discriminator: {}", payload.discriminator);
+            println!("Passcode:      {}", payload.pincode);
+            println!("Vendor ID:     {}", payload.vid);
+            println!("Product ID:    {}", payload.pid);
+            
+            if payload.flow == CommissioningFlow::UserIntent {
+                println!("User action required on device.");
+            }
+        },
+        Err(e) => eprintln!("Failed to parse payload: {}", e),
+    }
+}
+----
+
+== Technical Details
+
+The Matter onboarding payload is a compact binary format that packs several pieces of information into a specific bitstream. This library abstracts away the following technical layers:
+
+1.  **Bit Packing**: Data fields (Discriminator, PIN, VID, PID, etc.) are packed into a continuous bit stream, often with non-standard bit widths (e.g., 12 bits, 27 bits).
+2.  **Base38 Encoding**: The bit stream is encoded using a custom Base38 alphabet designed for QR codes, utilizing alphanumeric characters while excluding ambiguous ones (like I, O, Q, Z).
+3.  **Verhoeff Algorithm**: Manual pairing codes utilize the Verhoeff checksum algorithm to detect single-digit errors and adjacent transpositions, ensuring a better user experience during manual entry.
+
+== Security and Quality Assurance
+
+Security is a primary design goal of this library, particularly because it parses untrusted input from external devices (QR codes and manual pairing codes). To ensure robustness against malformed data and supply chain attacks, this repository employs a comprehensive Continuous Integration pipeline.
+
+=== Continuous Verification
+
+Every change to the codebase is validated against the following security layers:
+
+* **Fuzz Testing**: The parsing logic is subjected to continuous fuzzing using `cargo-fuzz` (based on LLVM's libFuzzer). This ensures that random, malformed, or hostile inputs result in safe errors rather than panics or crashes.
+* **Supply Chain Audit**: We commit `Cargo.lock` to version control and run `cargo audit` on every pipeline. This checks the specific versions of all dependencies against the RustSec Advisory Database to ensure no known vulnerabilities are introduced.
+* **Static Analysis**: The code is strictly linted using `cargo clippy` to catch logic errors, integer overflows, and unidiomatic patterns that could lead to safety issues.
+
+=== Memory Safety
+
+By leveraging safe Rust, this library guarantees memory safety (no buffer overflows or use-after-free errors) at compile time. The implementation avoids `unsafe` blocks unless strictly necessary and vetted.
+
+== Sources and Acknowledgments
+
+This library is based on the logic defined in the Project CHIP (Matter) SDK. Specifically, it ports the functionality of the Python reference implementation:
+
+*   **Source**: https://github.com/project-chip/connectedhomeip
+*   **File**: `src/controller/python/matter/setup_payload/setup_payload.py`
+
+While the logic is derived from the official script to ensure correctness, this implementation is native Rust and optimized for safety and ergonomics within the Rust ecosystem.
+
+== License
+
+Licensed under either of
+
+*   Apache License, Version 2.0 (link:LICENSE-APACHE[LICENSE-APACHE] or http://www.apache.org/licenses/LICENSE-2.0)
+*   MIT license (link:LICENSE-MIT[LICENSE-MIT] or http://opensource.org/licenses/MIT)
+
+at your option.
+
+=== Contribution
+
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
+
+== AI Usage Disclaimer
+
+I believe in transparency regarding the use of Artificial Intelligence.
+
+* **Tools Used**:
+** Local LLMs (specifically `devstral-2` and `ministral-3` from Mistral running on Ollama).
+* **Scope**: AI was used for:
+** Writing code comments.
+** Function and struct documentation.
+** Peer reviewing code quality.
+** Documentation: This README was written with the assistance of `ministral-3` based on my French input, as English is not my primary language.
+* **Human Contribution**: The core logic, error handling, algorithm, and Matter specs implementation were written and verified by a human.

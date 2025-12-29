@@ -1,0 +1,73 @@
+stages:
+  - test
+  - security
+  - lint
+  - fuzz
+
+# Global cache to speed up Rust builds
+cache:
+  paths:
+    - .cargo/
+    - target/
+
+# 1. Standard Unit Tests
+test:unit:
+  stage: test
+  image: rust:latest
+  script:
+    - cargo test --verbose
+
+# 2. GitLab Secret Detection
+# Scans the history for accidental commit of keys/passwords
+include:
+  - template: Security/Secret-Detection.gitlab-ci.yml
+
+# 3. Rust-Specific Dependency Scanning (SCA)
+# Checks your dependencies against the RustSec Advisory Database
+audit:dependencies:
+  stage: security
+  image: rust:latest
+  before_script:
+    - cargo install cargo-audit
+  script:
+    - cargo audit
+  allow_failure: false # Fail the pipeline if a vulnerable dependency is found
+
+# 4. Rust-Specific Linting (Security & Quality)
+# Clippy catches common mistakes that lead to bugs or security flaws
+clippy:lint:
+  stage: lint
+  image: rust:latest
+  before_script:
+    - rustup component add clippy
+  script:
+    # -D warnings makes the pipeline fail if Clippy finds issues
+    - cargo clippy -- -D warnings
+  allow_failure: false
+
+# 5. GitLab SAST (Generic)
+# Uses Semgrep to scan for general code issues
+sast:
+  stage: security
+  include:
+    - template: Security/SAST.gitlab-ci.yml
+  variables:
+    SAST_EXCLUDED_PATHS: "target/, .cargo/"
+
+# 6. Fuzz Testing
+# Runs the fuzzer for a short duration to catch regressions
+fuzz:smoke-test:
+  stage: fuzz
+  image: rustlang/rust:nightly # Fuzzing requires Nightly Rust
+  variables:
+    # Set a timeout so the CI doesn't run forever
+    FUZZ_TIME: "60" 
+  before_script:
+    - cargo install cargo-fuzz
+  script:
+    # -max_total_time is passed to libFuzzer to stop after 60 seconds
+    - cargo fuzz run fuzz_target_1 -- -max_total_time=$FUZZ_TIME
+  cache:
+    paths:
+      - fuzz/target/
+      - .cargo/

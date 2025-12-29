@@ -83,11 +83,11 @@ impl ManualCodeData {
             bits.extend(u64_to_bits_be(chunk5, 16)?);
         } else {
             // Fill VID/PID with zeros if not present
-            bits.extend(std::iter::repeat(0).take(32));
+            bits.extend(std::iter::repeat_n(0, 32));
         }
 
         // Padding (7 bits)
-        bits.extend(std::iter::repeat(0).take(7));
+        bits.extend(std::iter::repeat_n(0, 7));
 
         // --- Pack and Parse ---
         // 1. Pack the expanded bits (0/1) into actual bytes

@@ -13,7 +13,7 @@ pub use common::CommissioningFlow;
 use crate::base38;
 use crate::bit_utils::{bits_to_u64_be, bytes_to_bits_be};
 use crate::error::{PayloadError, Result};
-use crate::verhoeff::{self, calculate_checksum};
+use crate::verhoeff::calculate_checksum;
 use deku::prelude::*;
 use manual::ManualCodeData;
 use qr::QrCodeData;
@@ -88,7 +88,7 @@ impl SetupPayload {
     ///
     /// Returns an error if the payload string is malformed, has an invalid
     /// checksum, or cannot be decoded.
-    pub fn from_str(payload_str: &str) -> Result<Self> {
+    pub fn parse_str(payload_str: &str) -> Result<Self> {
         if payload_str.starts_with("MT:") {
             let container = QrCodeData::parse_from_str(payload_str)?;
             Ok(SetupPayload::new(
@@ -121,7 +121,7 @@ impl SetupPayload {
                     None
                 },
             );
-            payload.short_discriminator = container.discriminator.into();
+            payload.short_discriminator = container.discriminator;
             payload.long_discriminator = None;
             payload.discovery = None;
             Ok(payload)
@@ -156,11 +156,7 @@ impl SetupPayload {
     /// # Errors
     /// Returns an error if the short discriminator is out of range (> 15).
     pub fn to_manual_code_str(&self) -> Result<String> {
-        // 1. Determine if we are in "Long" mode (Custom Flow / VID+PID present)
-        // Note: In Matter, if VID/PID are specified, we usually force the long code.
-        let has_vid_pid = self.vid.is_some() && self.pid.is_some();
-
-        // 2. Map Payload to ManualCode Struct
+        // 1. Map Payload to ManualCode Struct
         // WARNING: Divergence from standard/Python implementation
         // To support round-trip generation via CLI where a user might pass a small integer
         // (e.g. 2) as 'discriminator' expecting it to be the short discriminator,
@@ -203,13 +199,13 @@ impl SetupPayload {
             padding: 0,
         };
 
-        // 3. Serialize Struct to Bytes via Deku
+        // 2. Serialize Struct to Bytes via Deku
         let packed_bytes = manual_code.to_bytes()?;
 
-        // 4. Unpack bytes to raw bits (Reverse of pack_bits)
+        // 3. Unpack bytes to raw bits (Reverse of pack_bits)
         let bits = bytes_to_bits_be(&packed_bytes);
 
-        // 5. Reconstruct Chunks (Reverse of parse_from_str bit logic)
+        // 4. Reconstruct Chunks (Reverse of parse_from_str bit logic)
         // The parsing logic constructed the bitstream by concatenating chunks of specific sizes.
         // We must slice the stream using those exact sizes.
 
@@ -234,7 +230,7 @@ impl SetupPayload {
         //     code_string.push_str(&format!("{:05}{:05}", c4, c5));
         // }
 
-        // 6. Calculate Checksum (Verhoeff)
+        // 5. Calculate Checksum (Verhoeff)
         let checksum_digit = calculate_checksum(&code_string)?;
 
         // Append checksum (convert u8 digit to char)
@@ -242,11 +238,6 @@ impl SetupPayload {
 
         Ok(code_string)
     }
-
-    // /// Returns the 4-bit short discriminator.
-    // pub fn short_discriminator(&self) -> u8 {
-    //     (self.discriminator >> 8) as u8
-    // }
 }
 
 #[cfg(test)]
@@ -279,7 +270,7 @@ mod tests {
         // QRCode     : MT:Y.K904QI143LH13SH10
         assert_eq!(qr_str, "MT:Y.K904QI143LH13SH10");
 
-        let parsed_payload = SetupPayload::from_str(&qr_str).unwrap();
+        let parsed_payload = SetupPayload::parse_str(&qr_str).unwrap();
         assert_eq!(original_payload, parsed_payload);
     }
 
@@ -295,7 +286,7 @@ mod tests {
         // QRCode     : MT:Y.K904QI143LH13SH10
         assert_eq!(manual_str, "11237442363");
 
-        let parsed_payload = SetupPayload::from_str(&manual_str).unwrap();
+        let parsed_payload = SetupPayload::parse_str(&manual_str).unwrap();
 
         // Note: Manual parsing reconstructs the short discriminator into the high bits of the 12-bit field.
         assert_eq!(
@@ -320,7 +311,7 @@ mod tests {
         // Python ref: 11237442363
         assert_eq!(manual_str, "11237442363");
 
-        let parsed = SetupPayload::from_str(&manual_str).unwrap();
+        let parsed = SetupPayload::parse_str(&manual_str).unwrap();
         assert_eq!(payload.short_discriminator, parsed.short_discriminator);
         assert_eq!(payload.pincode, parsed.pincode);
     }
@@ -328,14 +319,14 @@ mod tests {
     #[test]
     fn test_invalid_manual_code_errors() {
         // Invalid length
-        let err = SetupPayload::from_str("12345").unwrap_err();
+        let err = SetupPayload::parse_str("12345").unwrap_err();
         assert!(matches!(
             err,
             MatterPayloadError::Payload(PayloadError::InvalidManualCodeLength(5))
         ));
 
         // Invalid checksum
-        let err = SetupPayload::from_str("20000000031").unwrap_err();
+        let err = SetupPayload::parse_str("20000000031").unwrap_err();
         assert!(matches!(
             err,
             MatterPayloadError::Payload(PayloadError::InvalidManualCodeChecksum)

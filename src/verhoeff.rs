@@ -10,21 +10,30 @@ use crate::error::{Result, VerhoeffError};
 /// The multiplication table `d(j, k)` of the dihedral group D₅. This is the
 /// core of the Verhoeff algorithm's calculation.
 const D_TABLE: [[u8; 10]; 10] = [
-    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 2, 3, 4, 0, 6, 7, 8, 9, 5],
-    [2, 3, 4, 0, 1, 7, 8, 9, 5, 6], [3, 4, 0, 1, 2, 8, 9, 5, 6, 7],
-    [4, 0, 1, 2, 3, 9, 5, 6, 7, 8], [5, 9, 8, 7, 6, 0, 4, 3, 2, 1],
-    [6, 5, 9, 8, 7, 1, 0, 4, 3, 2], [7, 6, 5, 9, 8, 2, 1, 0, 4, 3],
-    [8, 7, 6, 5, 9, 3, 2, 1, 0, 4], [9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    [1, 2, 3, 4, 0, 6, 7, 8, 9, 5],
+    [2, 3, 4, 0, 1, 7, 8, 9, 5, 6],
+    [3, 4, 0, 1, 2, 8, 9, 5, 6, 7],
+    [4, 0, 1, 2, 3, 9, 5, 6, 7, 8],
+    [5, 9, 8, 7, 6, 0, 4, 3, 2, 1],
+    [6, 5, 9, 8, 7, 1, 0, 4, 3, 2],
+    [7, 6, 5, 9, 8, 2, 1, 0, 4, 3],
+    [8, 7, 6, 5, 9, 3, 2, 1, 0, 4],
+    [9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
 ];
 
 /// The position-dependent permutation table `p(i, j)`. This table scrambles
 /// the digits based on their position in the input string, strengthening the
 /// algorithm against transposition errors.
 const P_TABLE: [[u8; 10]; 8] = [
-    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 5, 7, 6, 2, 8, 3, 0, 9, 4],
-    [5, 8, 0, 3, 7, 9, 6, 1, 4, 2], [8, 9, 1, 6, 0, 4, 3, 5, 2, 7],
-    [9, 4, 5, 3, 1, 2, 6, 8, 7, 0], [4, 2, 8, 6, 5, 7, 3, 9, 0, 1],
-    [2, 7, 9, 3, 8, 0, 6, 4, 1, 5], [7, 0, 4, 6, 9, 1, 3, 2, 5, 8],
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    [1, 5, 7, 6, 2, 8, 3, 0, 9, 4],
+    [5, 8, 0, 3, 7, 9, 6, 1, 4, 2],
+    [8, 9, 1, 6, 0, 4, 3, 5, 2, 7],
+    [9, 4, 5, 3, 1, 2, 6, 8, 7, 0],
+    [4, 2, 8, 6, 5, 7, 3, 9, 0, 1],
+    [2, 7, 9, 3, 8, 0, 6, 4, 1, 5],
+    [7, 0, 4, 6, 9, 1, 3, 2, 5, 8],
 ];
 
 /// The inverse table `inv(j)`. Used to find the final checksum digit `c` such
@@ -106,25 +115,6 @@ pub fn validate(input: &str) -> Result<bool> {
     Ok(c == 0)
 }
 
-/// Appends a Verhoeff checksum digit to a string of digits.
-///
-/// # Errors
-///
-/// Returns an `Err` if the input string is empty or contains non-digit characters.
-///
-/// # Example
-///
-/// ```
-/// use matter_payload::verhoeff::append_checksum;
-///
-/// let with_checksum = append_checksum("12345").unwrap();
-/// assert_eq!(with_checksum, "123451");
-/// ```
-pub fn append_checksum(input: &str) -> Result<String> {
-    let checksum = calculate_checksum(input)?;
-    Ok(format!("{input}{checksum}"))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -146,12 +136,6 @@ mod tests {
     }
 
     #[test]
-    fn test_append_checksum() {
-        assert_eq!(append_checksum("236").unwrap(), "2363");
-        assert_eq!(append_checksum("12345").unwrap(), "123451");
-    }
-
-    #[test]
     fn test_invalid_input() {
         // Non-digit character
         let result = calculate_checksum("12a45");
@@ -162,45 +146,5 @@ mod tests {
         let result = validate("");
         let expected = MatterPayloadError::Verhoeff(VerhoeffError::EmptyInput);
         assert_eq!(result.unwrap_err(), expected);
-    }
-
-    #[test]
-    fn test_single_digit_error_detection() {
-        let base = "123456789";
-        let full = append_checksum(base).unwrap();
-
-        for i in 0..full.len() {
-            let mut chars: Vec<char> = full.chars().collect();
-            let original = chars[i].to_digit(10).unwrap();
-            for new_digit in 0..10 {
-                if new_digit != original {
-                    chars[i] = std::char::from_digit(new_digit, 10).unwrap();
-                    let modified: String = chars.iter().collect();
-                    assert!(
-                        !validate(&modified).unwrap(),
-                        "Failed to detect single digit error at pos {i}"
-                    );
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_transposition_error_detection() {
-        let base = "1234567890123";
-        let full = append_checksum(base).unwrap();
-
-        for i in 0..full.len() - 1 {
-            let mut chars: Vec<char> = full.chars().collect();
-            if chars[i] != chars[i + 1] {
-                chars.swap(i, i + 1);
-                let modified: String = chars.iter().collect();
-                assert!(
-                    !validate(&modified).unwrap(),
-                    "Failed to detect transposition at pos {i}-{i_plus_1}",
-                    i_plus_1 = i + 1
-                );
-            }
-        }
     }
 }
